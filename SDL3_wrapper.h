@@ -6,6 +6,11 @@
 
 namespace Render {
 class SDL3Wrapper {
+   public:
+    typedef struct VertexData {
+        float x, y, z;
+    } VertexData;
+
    private:
     struct Context {
         Context() { SDL_Init(SDL_INIT_VIDEO); }
@@ -23,23 +28,39 @@ class SDL3Wrapper {
 
     SDL_GPUBuffer* m_vertex_buffer;
 
-    std::shared_ptr<std::vector<std::vector<float>>> m_meshes;
+    SDL_GPUGraphicsPipeline* m_pipeline;
+
+    SDL_GPUTexture* m_depth_texture;
+
+    std::shared_ptr<std::vector<std::array<SDL3Wrapper::VertexData, 3>>>
+        m_meshes;
 
    private:
     void init_window(std::string title, int width, int height,
                      bool is_fullscreen);
+    void init_render();
+
+    SDL_GPUShader* load_shader(const unsigned char (&compiled)[],
+                               const unsigned int compiled_len, bool is_vertex);
+
+    void render();
+
+    void setDepthTexture(Uint32 texture_width, Uint32 texture_height);
 
    public:
     SDL3Wrapper(std::string title, int width, int height, bool is_fullscreen) {
         init_window(title, width, height, is_fullscreen);
     }
     ~SDL3Wrapper() {
+        // Will be released first
         if (m_vertex_buffer != nullptr)
             SDL_ReleaseGPUBuffer(m_gpu.get(), m_vertex_buffer);
+        if (m_pipeline != nullptr)
+            SDL_ReleaseGPUGraphicsPipeline(m_gpu.get(), m_pipeline);
         SDL_ReleaseWindowFromGPUDevice(m_gpu.get(), m_window.get());
     }
-    void main_loop(std::shared_ptr<std::vector<std::vector<float>>> meshes);
-
-    void init_render();
+    void main_loop(
+        std::shared_ptr<std::vector<std::array<SDL3Wrapper::VertexData, 3>>>
+            meshes);
 };
 }  // namespace Render
