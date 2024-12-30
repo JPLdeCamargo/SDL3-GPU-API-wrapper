@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace Render {
 class SDL3Wrapper {
@@ -20,6 +21,10 @@ class SDL3Wrapper {
     std::unique_ptr<SDL_GPUDevice, decltype(&SDL_DestroyGPUDevice)> m_gpu = {
         nullptr, SDL_DestroyGPUDevice};
 
+    SDL_GPUBuffer* m_vertex_buffer;
+
+    std::shared_ptr<std::vector<std::vector<float>>> m_meshes;
+
    private:
     void init_window(std::string title, int width, int height,
                      bool is_fullscreen);
@@ -29,8 +34,12 @@ class SDL3Wrapper {
         init_window(title, width, height, is_fullscreen);
     }
     ~SDL3Wrapper() {
+        if (m_vertex_buffer != nullptr)
+            SDL_ReleaseGPUBuffer(m_gpu.get(), m_vertex_buffer);
         SDL_ReleaseWindowFromGPUDevice(m_gpu.get(), m_window.get());
     }
-    void main_loop();
+    void main_loop(std::shared_ptr<std::vector<std::vector<float>>> meshes);
+
+    void init_render();
 };
 }  // namespace Render

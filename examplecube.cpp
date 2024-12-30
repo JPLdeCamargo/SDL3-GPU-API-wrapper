@@ -650,9 +650,7 @@ void loop(void) {
         SDLTest_CommonEvent(state, &event, &done);
     }
     if (!done) {
-        for (i = 0; i < state->num_windows; ++i) {
-            Render(state->windows[i], i);
-        }
+        Render(state->windows[0], 0);
     }
 #ifdef __EMSCRIPTEN__
     else {
