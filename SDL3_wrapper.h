@@ -53,6 +53,8 @@ class SDL3Wrapper {
     }
     ~SDL3Wrapper() {
         // Will be released first
+        if (m_depth_texture != nullptr)
+            SDL_ReleaseGPUTexture(m_gpu.get(), m_depth_texture);
         if (m_vertex_buffer != nullptr)
             SDL_ReleaseGPUBuffer(m_gpu.get(), m_vertex_buffer);
         if (m_pipeline != nullptr)

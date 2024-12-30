@@ -59,10 +59,9 @@ void SDL3Wrapper::main_loop(
     }
 }
 
-// break into smaller functions
+// break into smaller functions, maybe
 void SDL3Wrapper::init_render() {
     Uint32 size = sizeof(m_meshes->at(0));
-    std::cout << size << std::endl;
 
     // Creating vertex buffer
     SDL_GPUBufferCreateInfo create_buff_info;
