@@ -14,7 +14,9 @@ auto triangle = std::vector<VertexData>{
 
 int main() {
     auto wrapper = Render::SDL3Wrapper("Test", 500, 500, false);
-    auto mesh = SkinnedMesh(triangle, "./wall.png");
+
+    std::string path = "/home/jp203/projects/prototypes/sdl_hello/wall.jpg";
+    auto mesh = SkinnedMesh(triangle, path);
     auto mesh_vector = {mesh};
     auto ptr = std::make_shared<std::vector<SkinnedMesh>>(mesh_vector);
     wrapper.main_loop(ptr);

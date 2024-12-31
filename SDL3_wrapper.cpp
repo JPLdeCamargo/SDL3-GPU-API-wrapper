@@ -49,24 +49,38 @@ void SDL3Wrapper::main_loop(std::shared_ptr<std::vector<SkinnedMesh>> meshes) {
 // break into smaller functions, maybe
 void SDL3Wrapper::init_render() {
     const auto &vertices = m_meshes->at(0).vertices;
+    const auto &texture = m_meshes->at(0).texture;
     Uint32 size = sizeof(vertices[0]) * vertices.size();
 
     // Creating vertex buffer
-    SDL_GPUBufferCreateInfo create_buff_info;
-    create_buff_info.usage = SDL_GPU_BUFFERUSAGE_VERTEX;
-    create_buff_info.size = size;
-    create_buff_info.props = 0;
+    auto vert_info = SDL_GPUBufferCreateInfo{
+        .usage = SDL_GPU_BUFFERUSAGE_VERTEX,
+        .size = size,
+    };
+    m_vertex_buffer = SDL_CreateGPUBuffer(m_gpu.get(), &vert_info);
 
-    m_vertex_buffer = SDL_CreateGPUBuffer(m_gpu.get(), &create_buff_info);
     CHECK_CREATE(m_vertex_buffer, "Static vertex buffer");
 
+    // Creating texture resources
+    auto tex_create_info = SDL_GPUTextureCreateInfo{
+        .type = SDL_GPU_TEXTURETYPE_2D,
+        .format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM,
+        .usage = SDL_GPU_TEXTUREUSAGE_SAMPLER,
+        .width = (Uint32)texture->w,
+        .height = (Uint32)texture->h,
+        .layer_count_or_depth = 1,
+        .num_levels = 1,
+    };
+    m_texture = SDL_CreateGPUTexture(m_gpu.get(), &tex_create_info);
+    CHECK_CREATE(m_texture, "Texture gpu");
+
     // Creating transfer buffer
-    SDL_GPUTransferBufferCreateInfo transfer_buffer_info;
-    transfer_buffer_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
-    transfer_buffer_info.size = size;
-    transfer_buffer_info.props = 0;
+    auto transfer_info = SDL_GPUTransferBufferCreateInfo{
+        .usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD,
+        .size = size,
+    };
     auto transfer_buffer =
-        SDL_CreateGPUTransferBuffer(m_gpu.get(), &transfer_buffer_info);
+        SDL_CreateGPUTransferBuffer(m_gpu.get(), &transfer_info);
     CHECK_CREATE(transfer_buffer, "Vertex transfer buffer");
 
     /* We just need to upload the static data once. */
@@ -74,22 +88,55 @@ void SDL3Wrapper::init_render() {
     SDL_memcpy(map, vertices.data(), size);
     SDL_UnmapGPUTransferBuffer(m_gpu.get(), transfer_buffer);
 
-    // Passing data with transfer buffer ????
+    // Set up texture data
+    auto transfer_tex_info = SDL_GPUTransferBufferCreateInfo{
+        .usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD,
+        .size = (Uint32)(texture->w * texture->h * 4),
+
+    };
+    auto texture_transfer_buffer =
+        SDL_CreateGPUTransferBuffer(m_gpu.get(), &transfer_tex_info);
+
+    // Transfer texture data
+    void *texture_transfer_ptr =
+        SDL_MapGPUTransferBuffer(m_gpu.get(), texture_transfer_buffer, false);
+    SDL_memcpy(texture_transfer_ptr, texture->pixels,
+               texture->w * texture->h * 4);
+    SDL_UnmapGPUTransferBuffer(m_gpu.get(), texture_transfer_buffer);
+
+    // Upload the transfer data to the GPU resources
     auto cmd_buffer = SDL_AcquireGPUCommandBuffer(m_gpu.get());
     auto copy_pass = SDL_BeginGPUCopyPass(cmd_buffer);
-    SDL_GPUTransferBufferLocation buf_location;
-    buf_location.transfer_buffer = transfer_buffer;
-    buf_location.offset = 0;
 
-    SDL_GPUBufferRegion dst_region;
-    dst_region.buffer = m_vertex_buffer;
-    dst_region.offset = 0;
-    dst_region.size = size;
-    SDL_UploadToGPUBuffer(copy_pass, &buf_location, &dst_region, false);
+    auto transfer_location = SDL_GPUTransferBufferLocation{
+        .transfer_buffer = transfer_buffer,
+        .offset = 0,
+    };
+    auto buffer_region = SDL_GPUBufferRegion{
+        .buffer = m_vertex_buffer,
+        .offset = 0,
+        .size = size,
+    };
+    SDL_UploadToGPUBuffer(copy_pass, &transfer_location, &buffer_region, false);
+
+    auto texture_transfer_info = SDL_GPUTextureTransferInfo{
+        .transfer_buffer = texture_transfer_buffer,
+        .offset = 0,
+    };
+    auto texture_buffer_region = SDL_GPUTextureRegion{
+        .texture = m_texture,
+        .w = (Uint32)texture->w,
+        .h = (Uint32)texture->h,
+        .d = 1,
+    };
+    SDL_UploadToGPUTexture(copy_pass, &texture_transfer_info,
+                           &texture_buffer_region, false);
+
     SDL_EndGPUCopyPass(copy_pass);
     SDL_SubmitGPUCommandBuffer(cmd_buffer);
 
     SDL_ReleaseGPUTransferBuffer(m_gpu.get(), transfer_buffer);
+    SDL_ReleaseGPUTransferBuffer(m_gpu.get(), texture_transfer_buffer);
 
     // Loading shaders
     auto vertex_shader = load_shader(vert_spv, vert_spv_len, true);
@@ -129,16 +176,19 @@ void SDL3Wrapper::init_render() {
     vertex_buffer_desc.pitch = sizeof(VertexData);
 
     // Setup vertex attributes, "in" variables on shader
-    SDL_GPUVertexAttribute vertex_attributes[2];
-    vertex_attributes[0].buffer_slot = 0;
-    vertex_attributes[0].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3;
-    vertex_attributes[0].location = 0;
-    vertex_attributes[0].offset = 0;
-
-    vertex_attributes[1].buffer_slot = 0;
-    vertex_attributes[1].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2;
-    vertex_attributes[1].location = 1;
-    vertex_attributes[1].offset = sizeof(float) * 3;
+    SDL_GPUVertexAttribute vertex_attributes[2]{
+        {
+            .location = 0,
+            .buffer_slot = 0,
+            .format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3,
+            .offset = 0,
+        },
+        {
+            .location = 1,
+            .buffer_slot = 0,
+            .format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2,
+            .offset = sizeof(float) * 3,
+        }};
 
     pipeline_info.vertex_input_state.num_vertex_buffers = 1;
     pipeline_info.vertex_input_state.vertex_buffer_descriptions =
@@ -148,7 +198,6 @@ void SDL3Wrapper::init_render() {
         (SDL_GPUVertexAttribute *)&vertex_attributes;
 
     pipeline_info.props = 0;
-
     m_pipeline = SDL_CreateGPUGraphicsPipeline(m_gpu.get(), &pipeline_info);
     CHECK_CREATE(m_pipeline, "Render Pipeline");
 
@@ -157,22 +206,31 @@ void SDL3Wrapper::init_render() {
     SDL_ReleaseGPUShader(m_gpu.get(), vertex_shader);
     SDL_ReleaseGPUShader(m_gpu.get(), frag_shader);
 
-    // setup depth texture
-    Uint32 texture_w, texture_h;
-    SDL_GetWindowSizeInPixels(m_window.get(), (int *)&texture_w,
-                              (int *)&texture_h);
-    setDepthTexture(texture_w, texture_h);
+    // Set up depth texture
+    Uint32 depth_w, depth_h;
+    SDL_GetWindowSizeInPixels(m_window.get(), (int *)&depth_w, (int *)&depth_h);
+    setDepthTexture(depth_w, depth_h);
+
+    // Set up sampler
+    auto sampler_info = SDL_GPUSamplerCreateInfo{
+        .min_filter = SDL_GPU_FILTER_NEAREST,
+        .mag_filter = SDL_GPU_FILTER_NEAREST,
+        .mipmap_mode = SDL_GPU_SAMPLERMIPMAPMODE_NEAREST,
+        .address_mode_u = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE,
+        .address_mode_v = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE,
+        .address_mode_w = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE,
+    };
+    m_texture_sampler = SDL_CreateGPUSampler(m_gpu.get(), &sampler_info);
 }
 
 SDL_GPUShader *SDL3Wrapper::load_shader(const unsigned char (&compiled)[],
                                         const unsigned int compiled_len,
                                         bool is_vertex) {
     SDL_GPUShaderCreateInfo createinfo;
-    createinfo.num_samplers = 0;
+    createinfo.num_samplers = is_vertex ? 0 : 1;
     createinfo.num_storage_buffers = 0;
     createinfo.num_storage_textures = 0;
-    createinfo.num_uniform_buffers = is_vertex ? 1 : 0;
-    SDL_GPUShaderFormat format = SDL_GetGPUShaderFormats(m_gpu.get());
+    createinfo.num_uniform_buffers = 0;
     createinfo.format = SDL_GPU_SHADERFORMAT_SPIRV;
     createinfo.code = compiled;
     createinfo.code_size = compiled_len;
@@ -185,15 +243,12 @@ SDL_GPUShader *SDL3Wrapper::load_shader(const unsigned char (&compiled)[],
 
 void SDL3Wrapper::render() {
     // acquire command buffer and swap texture
-
     auto command_buffer = SDL_AcquireGPUCommandBuffer(m_gpu.get());
     CHECK_CREATE(command_buffer, "Command buffer");
 
     SDL_GPUTexture *swapchain_texture;
-    Uint32 texture_w, texture_h;
     bool acquired_swapchain_texture = SDL_AcquireGPUSwapchainTexture(
-        command_buffer, m_window.get(), &swapchain_texture, &texture_w,
-        &texture_h);
+        command_buffer, m_window.get(), &swapchain_texture, nullptr, nullptr);
     CHECK_CREATE(acquired_swapchain_texture, "Swapchain texture")
 
     if (swapchain_texture == nullptr) {
@@ -220,20 +275,24 @@ void SDL3Wrapper::render() {
     depth_target.texture = m_depth_texture;
     depth_target.cycle = true;
 
-    // set up vertex binding
-    SDL_GPUBufferBinding vertex_binding;
-    vertex_binding.buffer = m_vertex_buffer;
-    vertex_binding.offset = 0;
-
-    auto &mesh = m_meshes->at(0);
-    std::cout << "hereee" << std::endl;
-    SDL_PushGPUVertexUniformData(command_buffer, 0, mesh.texture,
-                                 mesh.height * mesh.width);
-
     auto pass =
         SDL_BeginGPURenderPass(command_buffer, &color_target, 1, &depth_target);
+
+    // bindings
     SDL_BindGPUGraphicsPipeline(pass, m_pipeline);
-    SDL_BindGPUVertexBuffers(pass, 0, &vertex_binding, 1);
+
+    auto vert_binding = SDL_GPUBufferBinding{
+        .buffer = m_vertex_buffer,
+        .offset = 0,
+    };
+    SDL_BindGPUVertexBuffers(pass, 0, &vert_binding, 1);
+
+    auto tex_binding = SDL_GPUTextureSamplerBinding{
+        .texture = m_texture,
+        .sampler = m_texture_sampler,
+    };
+    SDL_BindGPUFragmentSamplers(pass, 0, &tex_binding, 1);
+
     SDL_DrawGPUPrimitives(pass, 3, 1, 0, 0);
     SDL_EndGPURenderPass(pass);
 

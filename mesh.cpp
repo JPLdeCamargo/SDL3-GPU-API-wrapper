@@ -3,6 +3,8 @@
 using namespace Render;
 
 void SkinnedMesh::load_texture(std::string path) {
-    int n_channels;
-    texture = stbi_load(path.c_str(), &width, &height, &n_channels, 0);
+    texture = IMG_Load(path.c_str());
+    if (texture == nullptr) {
+        std::cerr << "Failed to load texture: " << SDL_GetError() << std::endl;
+    }
 }

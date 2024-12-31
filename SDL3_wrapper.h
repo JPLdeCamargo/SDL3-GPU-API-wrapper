@@ -25,6 +25,10 @@ class SDL3Wrapper {
 
     SDL_GPUBuffer* m_vertex_buffer;
 
+    SDL_GPUTexture* m_texture;
+
+    SDL_GPUSampler* m_texture_sampler;
+
     SDL_GPUGraphicsPipeline* m_pipeline;
 
     SDL_GPUTexture* m_depth_texture;
@@ -42,6 +46,8 @@ class SDL3Wrapper {
     void render();
 
     void setDepthTexture(Uint32 texture_width, Uint32 texture_height);
+
+    SDL_GPUTexture* load_texture(SkinnedMesh& mesh);
 
    public:
     SDL3Wrapper(std::string title, int width, int height, bool is_fullscreen) {

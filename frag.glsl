@@ -1,12 +1,13 @@
 #version 450 core
 
+layout(set = 2, binding = 0) uniform sampler2D Texture;
+
 layout(location = 0) in vec2 TexCoords;
 
 layout(location = 0) out vec4 FragColor;
 
-layout(binding = 0) uniform sampler2D ourTexture;
 
 void main()
 {
-    FragColor = texture(ourTexture, TexCoords);
+    FragColor = texture(Texture, TexCoords);
 } 

@@ -1,9 +1,11 @@
+#include <SDL3/SDL.h>
+#include <SDL3_image/SDL_image.h>
+
+#include <iostream>
 #include <string>
 #include <vector>
 
 #pragma once
-
-#include "stb_image.h"
 
 namespace Render {
 
@@ -15,16 +17,14 @@ typedef struct VertexData {
 class SkinnedMesh {
    public:
     std::vector<VertexData> vertices;
-    unsigned char* texture;
-    int texture_size;
-    int width, height;
+    SDL_Surface* texture;
 
    public:
     SkinnedMesh(std::vector<VertexData> vertices, std::string texture_path) {
         load_texture(texture_path);
         this->vertices = vertices;
     };
-    ~SkinnedMesh() { stbi_image_free(texture); };
+    ~SkinnedMesh() { SDL_DestroySurface(texture); };
 
    private:
     void load_texture(std::string texture_path);
