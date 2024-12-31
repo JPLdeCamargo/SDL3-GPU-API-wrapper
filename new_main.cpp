@@ -13,7 +13,7 @@ auto triangle = std::vector<VertexData>{
 };
 
 int main() {
-    auto wrapper = Render::SDL3Wrapper("Test", 500, 500, false);
+    auto wrapper = Render::SDL3Wrapper("Test", 1000, 1000, false);
 
     std::string path = "/home/jp203/projects/prototypes/sdl_hello/wall.jpg";
     auto mesh = SkinnedMesh(triangle, path);

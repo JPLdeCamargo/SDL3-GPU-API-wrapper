@@ -51,6 +51,7 @@ void SDL3Wrapper::init_render() {
     const auto &vertices = m_meshes->at(0).vertices;
     const auto &texture = m_meshes->at(0).texture;
     Uint32 size = sizeof(vertices[0]) * vertices.size();
+    Uint32 text_size = texture->h * texture->w * 4;
 
     // Creating vertex buffer
     auto vert_info = SDL_GPUBufferCreateInfo{
@@ -91,8 +92,7 @@ void SDL3Wrapper::init_render() {
     // Set up texture data
     auto transfer_tex_info = SDL_GPUTransferBufferCreateInfo{
         .usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD,
-        .size = (Uint32)(texture->w * texture->h * 4),
-
+        .size = text_size,
     };
     auto texture_transfer_buffer =
         SDL_CreateGPUTransferBuffer(m_gpu.get(), &transfer_tex_info);
@@ -100,8 +100,7 @@ void SDL3Wrapper::init_render() {
     // Transfer texture data
     void *texture_transfer_ptr =
         SDL_MapGPUTransferBuffer(m_gpu.get(), texture_transfer_buffer, false);
-    SDL_memcpy(texture_transfer_ptr, texture->pixels,
-               texture->w * texture->h * 4);
+    SDL_memcpy(texture_transfer_ptr, texture->pixels, text_size);
     SDL_UnmapGPUTransferBuffer(m_gpu.get(), texture_transfer_buffer);
 
     // Upload the transfer data to the GPU resources
