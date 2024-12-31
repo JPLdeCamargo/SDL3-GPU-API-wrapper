@@ -31,23 +31,10 @@ void SDL3Wrapper::init_window(std::string title, int width, int height,
     SDL_ClaimWindowForGPUDevice(m_gpu.get(), m_window.get());
 }
 
-void SDL3Wrapper::main_loop(
-    std::shared_ptr<std::vector<std::array<SDL3Wrapper::VertexData, 3>>>
-        meshes) {
-    // SDL_Surface *screen_surface = SDL_GetWindowSurface(m_window.get());
-    // const SDL_PixelFormatDetails *details =
-    //     SDL_GetPixelFormatDetails(screen_surface->format);
-
-    // CHECK_CREATE(details, "Pixel details");
-
+void SDL3Wrapper::main_loop(std::shared_ptr<std::vector<SkinnedMesh>> meshes) {
     m_meshes = meshes;
+
     init_render();
-
-    // Uint32 color = SDL_MapRGB(details, NULL, 255, 0, 0);
-
-    // SDL_FillSurfaceRect(screen_surface, NULL, color);
-
-    // SDL_UpdateWindowSurface(m_window.get());
 
     SDL_Event e;
     bool quit = false;
@@ -61,7 +48,8 @@ void SDL3Wrapper::main_loop(
 
 // break into smaller functions, maybe
 void SDL3Wrapper::init_render() {
-    Uint32 size = sizeof(m_meshes->at(0));
+    const auto &vertices = m_meshes->at(0).vertices;
+    Uint32 size = sizeof(vertices[0]) * vertices.size();
 
     // Creating vertex buffer
     SDL_GPUBufferCreateInfo create_buff_info;
@@ -83,7 +71,7 @@ void SDL3Wrapper::init_render() {
 
     /* We just need to upload the static data once. */
     void *map = SDL_MapGPUTransferBuffer(m_gpu.get(), transfer_buffer, false);
-    SDL_memcpy(map, &m_meshes->at(0), size);
+    SDL_memcpy(map, vertices.data(), size);
     SDL_UnmapGPUTransferBuffer(m_gpu.get(), transfer_buffer);
 
     // Passing data with transfer buffer ????
@@ -104,7 +92,7 @@ void SDL3Wrapper::init_render() {
     SDL_ReleaseGPUTransferBuffer(m_gpu.get(), transfer_buffer);
 
     // Loading shaders
-    auto vertex_shader = load_shader(vertex_spv, vertex_spv_len, true);
+    auto vertex_shader = load_shader(vert_spv, vert_spv_len, true);
     auto frag_shader = load_shader(frag_spv, frag_spv_len, false);
 
     // Pipeline setup
@@ -141,16 +129,21 @@ void SDL3Wrapper::init_render() {
     vertex_buffer_desc.pitch = sizeof(VertexData);
 
     // Setup vertex attributes, "in" variables on shader
-    SDL_GPUVertexAttribute vertex_attributes[1];
+    SDL_GPUVertexAttribute vertex_attributes[2];
     vertex_attributes[0].buffer_slot = 0;
     vertex_attributes[0].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3;
     vertex_attributes[0].location = 0;
     vertex_attributes[0].offset = 0;
 
+    vertex_attributes[1].buffer_slot = 0;
+    vertex_attributes[1].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2;
+    vertex_attributes[1].location = 1;
+    vertex_attributes[1].offset = sizeof(float) * 3;
+
     pipeline_info.vertex_input_state.num_vertex_buffers = 1;
     pipeline_info.vertex_input_state.vertex_buffer_descriptions =
         &vertex_buffer_desc;
-    pipeline_info.vertex_input_state.num_vertex_attributes = 1;
+    pipeline_info.vertex_input_state.num_vertex_attributes = 2;
     pipeline_info.vertex_input_state.vertex_attributes =
         (SDL_GPUVertexAttribute *)&vertex_attributes;
 
@@ -231,6 +224,11 @@ void SDL3Wrapper::render() {
     SDL_GPUBufferBinding vertex_binding;
     vertex_binding.buffer = m_vertex_buffer;
     vertex_binding.offset = 0;
+
+    auto &mesh = m_meshes->at(0);
+    std::cout << "hereee" << std::endl;
+    SDL_PushGPUVertexUniformData(command_buffer, 0, mesh.texture,
+                                 mesh.height * mesh.width);
 
     auto pass =
         SDL_BeginGPURenderPass(command_buffer, &color_target, 1, &depth_target);

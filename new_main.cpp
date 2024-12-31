@@ -2,16 +2,20 @@
 #include <iostream>
 
 #include "SDL3_wrapper.h"
+#include "mesh.h"
 
 using namespace Render;
 
-auto triangle = std::array<SDL3Wrapper::VertexData, 3>{
-    {{-0.5f, -0.0f, 0.0f}, {0.0f, 0.5f, 0.0f}, {0.5f, 0.0f, 0.0f}}};
-
-using meshes = std::vector<std::array<SDL3Wrapper::VertexData, 3>>;
+auto triangle = std::vector<VertexData>{
+    {-0.5f, -0.5f, 0.0f, 0.0f, 0.0f},
+    {0.5f, -0.5f, 0.0f, 1.0f, 0.0f},
+    {0.0f, 0.5f, 0.0f, 0.5f, 1.0f},
+};
 
 int main() {
     auto wrapper = Render::SDL3Wrapper("Test", 500, 500, false);
-    auto to_render = std::make_shared<meshes>(meshes{triangle});
-    wrapper.main_loop(to_render);
+    auto mesh = SkinnedMesh(triangle, "./wall.png");
+    auto mesh_vector = {mesh};
+    auto ptr = std::make_shared<std::vector<SkinnedMesh>>(mesh_vector);
+    wrapper.main_loop(ptr);
 }

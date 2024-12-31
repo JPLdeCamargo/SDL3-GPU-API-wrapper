@@ -4,13 +4,10 @@
 #include <string>
 #include <vector>
 
+#include "mesh.h"
+
 namespace Render {
 class SDL3Wrapper {
-   public:
-    typedef struct VertexData {
-        float x, y, z;
-    } VertexData;
-
    private:
     struct Context {
         Context() { SDL_Init(SDL_INIT_VIDEO); }
@@ -32,8 +29,7 @@ class SDL3Wrapper {
 
     SDL_GPUTexture* m_depth_texture;
 
-    std::shared_ptr<std::vector<std::array<SDL3Wrapper::VertexData, 3>>>
-        m_meshes;
+    std::shared_ptr<std::vector<SkinnedMesh>> m_meshes;
 
    private:
     void init_window(std::string title, int width, int height,
@@ -61,8 +57,6 @@ class SDL3Wrapper {
             SDL_ReleaseGPUGraphicsPipeline(m_gpu.get(), m_pipeline);
         SDL_ReleaseWindowFromGPUDevice(m_gpu.get(), m_window.get());
     }
-    void main_loop(
-        std::shared_ptr<std::vector<std::array<SDL3Wrapper::VertexData, 3>>>
-            meshes);
+    void main_loop(std::shared_ptr<std::vector<SkinnedMesh>> meshes);
 };
 }  // namespace Render

@@ -608,7 +608,8 @@ static void init_render_state(int msaa) {
         SDL_CreateGPUGraphicsPipeline(gpu_device, &pipelinedesc);
     CHECK_CREATE(render_state.pipeline, "Render Pipeline")
 
-    /* These are reference-counted; once the pipeline is created, you don't need
+    /* These are reference-counted; once the pipeline is created, you don't
+    need
      * to keep these. */
     SDL_ReleaseGPUShader(gpu_device, vertex_shader);
     SDL_ReleaseGPUShader(gpu_device, fragment_shader);
