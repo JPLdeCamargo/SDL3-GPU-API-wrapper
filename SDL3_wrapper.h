@@ -25,6 +25,8 @@ class SDL3Wrapper {
 
     SDL_GPUBuffer* m_vertex_buffer;
 
+    SDL_GPUBuffer* m_index_buffer;
+
     SDL_GPUTexture* m_texture;
 
     SDL_GPUSampler* m_texture_sampler;

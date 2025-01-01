@@ -49,8 +49,10 @@ void SDL3Wrapper::main_loop(std::shared_ptr<std::vector<SkinnedMesh>> meshes) {
 // break into smaller functions, maybe
 void SDL3Wrapper::init_render() {
     const auto &vertices = m_meshes->at(0).vertices;
+    const auto &indices = m_meshes->at(0).indices;
     const auto &texture = m_meshes->at(0).texture;
     Uint32 size = sizeof(vertices[0]) * vertices.size();
+    Uint32 size_indices = sizeof(indices[0]) * indices.size();
     Uint32 text_size = texture->h * texture->w * 4;
 
     // Creating vertex buffer
@@ -59,6 +61,13 @@ void SDL3Wrapper::init_render() {
         .size = size,
     };
     m_vertex_buffer = SDL_CreateGPUBuffer(m_gpu.get(), &vert_info);
+
+    // Creating index buffer
+    auto index_info = SDL_GPUBufferCreateInfo{
+        .usage = SDL_GPU_BUFFERUSAGE_INDEX,
+        .size = size_indices,
+    };
+    m_index_buffer = SDL_CreateGPUBuffer(m_gpu.get(), &index_info);
 
     CHECK_CREATE(m_vertex_buffer, "Static vertex buffer");
 
@@ -78,7 +87,7 @@ void SDL3Wrapper::init_render() {
     // Creating transfer buffer
     auto transfer_info = SDL_GPUTransferBufferCreateInfo{
         .usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD,
-        .size = size,
+        .size = size + size_indices,
     };
     auto transfer_buffer =
         SDL_CreateGPUTransferBuffer(m_gpu.get(), &transfer_info);
@@ -87,6 +96,10 @@ void SDL3Wrapper::init_render() {
     /* We just need to upload the static data once. */
     void *map = SDL_MapGPUTransferBuffer(m_gpu.get(), transfer_buffer, false);
     SDL_memcpy(map, vertices.data(), size);
+    // copying index data to map
+    map = static_cast<char *>(map) + size;
+    SDL_memcpy(map, indices.data(), size_indices);
+
     SDL_UnmapGPUTransferBuffer(m_gpu.get(), transfer_buffer);
 
     // Set up texture data
@@ -117,6 +130,18 @@ void SDL3Wrapper::init_render() {
         .size = size,
     };
     SDL_UploadToGPUBuffer(copy_pass, &transfer_location, &buffer_region, false);
+
+    auto transfer_location_index = SDL_GPUTransferBufferLocation{
+        .transfer_buffer = transfer_buffer,
+        .offset = size,
+    };
+    auto buffer_region_index = SDL_GPUBufferRegion{
+        .buffer = m_index_buffer,
+        .offset = 0,
+        .size = size_indices,
+    };
+    SDL_UploadToGPUBuffer(copy_pass, &transfer_location_index,
+                          &buffer_region_index, false);
 
     auto texture_transfer_info = SDL_GPUTextureTransferInfo{
         .transfer_buffer = texture_transfer_buffer,
@@ -286,13 +311,20 @@ void SDL3Wrapper::render() {
     };
     SDL_BindGPUVertexBuffers(pass, 0, &vert_binding, 1);
 
+    auto index_binding = SDL_GPUBufferBinding{
+        .buffer = m_index_buffer,
+        .offset = 0,
+    };
+    SDL_BindGPUIndexBuffer(pass, &index_binding,
+                           SDL_GPU_INDEXELEMENTSIZE_32BIT);
+
     auto tex_binding = SDL_GPUTextureSamplerBinding{
         .texture = m_texture,
         .sampler = m_texture_sampler,
     };
     SDL_BindGPUFragmentSamplers(pass, 0, &tex_binding, 1);
 
-    SDL_DrawGPUPrimitives(pass, 3, 1, 0, 0);
+    SDL_DrawGPUIndexedPrimitives(pass, 6, 1, 0, 0, 0);
     SDL_EndGPURenderPass(pass);
 
     SDL_SubmitGPUCommandBuffer(command_buffer);

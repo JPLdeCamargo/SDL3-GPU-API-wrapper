@@ -17,12 +17,15 @@ typedef struct VertexData {
 class SkinnedMesh {
    public:
     std::vector<VertexData> vertices;
+    std::vector<Uint32> indices;
     SDL_Surface* texture;
 
    public:
-    SkinnedMesh(std::vector<VertexData> vertices, std::string texture_path) {
+    SkinnedMesh(std::vector<VertexData> vertices, std::vector<Uint32> indices,
+                std::string texture_path) {
         load_texture(texture_path);
         this->vertices = vertices;
+        this->indices = indices;
     };
     ~SkinnedMesh() { SDL_DestroySurface(texture); };
 
